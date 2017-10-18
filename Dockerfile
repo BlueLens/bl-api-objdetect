@@ -1,16 +1,16 @@
-FROM python:3-alpine
+FROM bluelens/tensorflow:1.3.0-py3
 
 ENV WEB_CONCURRENCY=4
 
-ADD . /bl_api_objdetect
+RUN mkdir -p /usr/src/app
 
-RUN apk add -U ca-certificates libffi libstdc++ && \
-    apk add --virtual build-deps build-base libffi-dev && \
-    # Pip
-    pip install --no-cache-dir gunicorn /bl_api_objdetect && \
-    # Cleaning up
-    apk del build-deps && \
-    rm -rf /var/cache/apk/*
+WORKDIR /usr/src/app
+
+COPY . /usr/src/app
+
+#RUN apt-get install ca-certificates libffi6 libstdc++ && \
+#    apt-get install --virtual build-deps build-base libffi-dev && \
+RUN pip install --no-cache-dir gunicorn /usr/src/app
 
 EXPOSE 8080
 
