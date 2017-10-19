@@ -1,0 +1,83 @@
+swagger: '2.0'
+info:
+  description: This is a API document for Object Detection on fashion items"
+  version: 0.0.1
+  title: stylelens_detector_sdk
+  contact:
+    email: devops@bluehack.net
+  license:
+    name: Apache 2.0
+    url: 'http://www.apache.org/licenses/LICENSE-2.0.html'
+host: 'objdetect.stylelens.io'
+basePath: /
+tags:
+  - name: detect
+    description: detect
+schemes:
+  - http
+paths:
+  /:
+    post:
+      tags:
+      - "detect"
+      summary: Query to detect obejects in the image you sent
+      description: Image file that needs to be detected objects
+      operationId: detectObjects
+      consumes:
+      - "multipart/form-data"
+      produces:
+      - "application/json"
+      parameters:
+      - name: "file"
+        in: "formData"
+        description: "Image file to upload (only support jpg format yet)"
+        required: false
+        type: "file"
+      responses:
+        200:
+          description: successful operation
+          schema:
+            $ref: '#/definitions/DetectObjectsResponse'
+        400:
+          description: Invalid input
+securityDefinitions:
+  api_key:
+    type: apiKey
+    name: api_key
+    in: header
+definitions:
+  BoxArray:
+    type: array
+    maxItems: 4
+    items:
+      type: number
+      format: float
+  BoxesArray:
+    type: array
+    items:
+      $ref: '#definitions/BoxObject'
+  BoxObject:
+    type: object
+    properties:
+      id:
+        type: string
+      box:
+        $ref: '#definitions/BoxArray'
+
+  DetectObjectsResponse:
+    type: object
+    properties:
+      code:
+        type: integer
+        format: int32
+        description: "0: success, 1: fail"
+      message:
+        type: string
+      data:
+        type: object
+        properties:
+          boxes:
+            $ref: '#/definitions/BoxesArray'
+externalDocs:
+  description: Find out more about BlueLens
+  url: 'http://bluelens.io'

@@ -33,4 +33,7 @@ spec:
         ports:
         - containerPort: 8080
           name: http-server
+        env:
+        - name: AWS_ACCESS_KEY
+          value: ""
 

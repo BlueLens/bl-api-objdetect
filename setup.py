@@ -32,6 +32,7 @@ setup(
     install_requires=[
         'flask', 'MarkupSafe', 'decorator', 'itsdangerous', 'six', 'brotlipy',
         'raven[flask]', 'flask_limiter', 'Flask-Common',
-        'pymongo', 'Pillow', 'tensorflow', 'colorama', 'ruamel_yaml'
+        'pymongo', 'Pillow', 'tensorflow', 'colorama', 'ruamel_yaml',
+        'boto3', 'gevent'
     ],
 )

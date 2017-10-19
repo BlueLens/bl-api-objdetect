@@ -93,7 +93,15 @@ ALLOWED_EXTENSIONS = set(['png', 'jpg', 'jpeg', 'gif'])
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
+
+
+
 od = ObjectDetector()
+
+
+def download_object_detection_model():
+    print('bok')
+
 
 # -----------
 # Middlewares
@@ -122,21 +130,25 @@ def allowed_file(filename):
 # ------
 
 @app.route('/', methods=['POST'])
-def object_detect():
+def detect_objects():
   if request.method == 'POST':
       file = request.files['file']
       if file and allowed_file(file.filename):
         im = Image.open(file.stream)
         # im.show()
         boxes = od.query(im)
+        response = {}
+        response['code'] = 0
+        response['message'] = ""
         dic = {}
         dic['boxes'] = boxes
+        response['data'] = dic
         # Dump data dict to jason
         # j = json.dumps(dic)
         # size = 300, 300
         # im.thumbnail(size, Image.ANTIALIAS)
         # im.show()
-        return jsonify(dic)
+        return jsonify(response)
 
 @app.route('/<image_id>', methods=['GET'])
 def query_id(image_id):

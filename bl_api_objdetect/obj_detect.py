@@ -8,11 +8,14 @@ import argparse
 import multiprocessing
 import tensorflow as tf
 from PIL import Image
+import json
 import urllib
 import time
 from pprint import pprint
-from util import label_map_util
+from util import label_map_util, s3
 from object_detection.utils import visualization_utils as vis_util
+import swagger_client
+from swagger_client.rest import ApiException
 
 try:
     from StringIO import StringIO
@@ -30,8 +33,6 @@ CWD_PATH = os.getcwd()
 # PATH_TO_LABELS = os.path.join(CWD_PATH, 'object_detection', 'data', 'mscoco_label_map.pbtxt')
 
 # PATH_TO_CKPT = os.path.join('/dataset/deepfashion', 'fig-742673', 'frozen_inference_graph.pb')
-PATH_TO_CKPT = os.path.join('/dataset/deepfashion', 'fig-644228', 'frozen_inference_graph.pb')
-PATH_TO_LABELS = os.path.join(CWD_PATH, 'label_map.pbtxt')
 # NUM_CLASSES = 4
 
 NUM_CLASSES = 89
@@ -48,15 +49,32 @@ PRODUCT_NO = 'product_no'
 MAIN = 'main'
 NATION = 'nation'
 
-# Loading label map
-label_map = label_map_util.load_labelmap(PATH_TO_LABELS)
-categories = label_map_util.convert_label_map_to_categories(label_map, max_num_classes=NUM_CLASSES,
-                                                            use_display_name=True)
-category_index = label_map_util.create_category_index(categories)
+
+AWS_ACCESS_KEY = os.environ['AWS_ACCESS_KEY'].replace('"', '')
+AWS_SECRET_ACCESS_KEY = os.environ['AWS_SECRET_ACCESS_KEY'].replace('"', '')
+
+AWS_BUCKET = 'bluelens-style-model'
+AWS_MODEL_DIR = 'object_detection'
+MODEL_FILE = 'frozen_inference_graph.pb'
+LABEL_FILE = 'label_map.pbtxt'
+
+# LOCAL_MODEL_DIR = '/dataset/deepfashion'
+LOCAL_MODEL_DIR = os.getcwd()
+
+PATH_TO_CKPT = os.path.join(LOCAL_MODEL_DIR, MODEL_FILE)
+PATH_TO_LABELS = os.path.join(LOCAL_MODEL_DIR, LABEL_FILE)
+
 
 
 class ObjectDetector:
   def __init__(self):
+    # self.download_model()
+    # Loading label map
+    self.__api_instance = swagger_client.ImageApi()
+    label_map = label_map_util.load_labelmap(PATH_TO_LABELS)
+    categories = label_map_util.convert_label_map_to_categories(label_map, max_num_classes=NUM_CLASSES,
+                                                                use_display_name=True)
+    self.__category_index = label_map_util.create_category_index(categories)
     self.__detection_graph = tf.Graph()
     with self.__detection_graph.as_default():
       od_graph_def = tf.GraphDef()
@@ -67,17 +85,29 @@ class ObjectDetector:
 
       self.__sess = tf.Session(graph=self.__detection_graph)
 
+  def download_model(self):
+    storage = s3.S3(AWS_ACCESS_KEY, AWS_SECRET_ACCESS_KEY)
+    storage.download_file_from_bucket(AWS_BUCKET,
+                                      os.path.join(LOCAL_MODEL_DIR, MODEL_FILE),
+                                      os.path.join(AWS_MODEL_DIR, MODEL_FILE))
+    storage.download_file_from_bucket(AWS_BUCKET,
+                                      os.path.join(LOCAL_MODEL_DIR, LABEL_FILE),
+                                      os.path.join(AWS_MODEL_DIR, LABEL_FILE))
+
   def query(self, image):
       image_np = self.load_image_into_numpy_array(image)
 
       show_box = True
       out_image, boxes, scores, classes, num_detections = self.detect_objects(image_np, self.__sess, self.__detection_graph, show_box)
 
+      image_info = swagger_client.Image()
       out_boxes = self.take_object(
+                  image_info,
                   out_image,
                   np.squeeze(boxes),
                   np.squeeze(scores),
                   np.squeeze(classes).astype(np.int32))
+      print(out_boxes)
 
       if show_box:
         img = Image.fromarray(out_image, 'RGB')
@@ -86,17 +116,17 @@ class ObjectDetector:
       return out_boxes
 
 
-  def take_object(self, image_np, boxes, scores, classes):
+  def take_object(self, image_info, image_np, boxes, scores, classes):
     max_boxes_to_save = 10
-    min_score_thresh = .7
+    min_score_thresh = .3
     taken_boxes = []
     if not max_boxes_to_save:
       max_boxes_to_save = boxes.shape[0]
     for i in range(min(max_boxes_to_save, boxes.shape[0])):
       if scores is None or scores[i] > min_score_thresh:
-        if classes[i] in category_index.keys():
-          class_name = category_index[classes[i]]['name']
-          class_code = category_index[classes[i]]['code']
+        if classes[i] in self.__category_index.keys():
+          class_name = self.__category_index[classes[i]]['name']
+          class_code = self.__category_index[classes[i]]['code']
         else:
           class_name = 'na'
           class_code = 'na'
@@ -104,16 +134,21 @@ class ObjectDetector:
         print(boxes[i])
         print(boxes[i].shape)
         ymin, xmin, ymax, xmax = tuple(boxes[i].tolist())
-        taken_boxes.append(boxes[i].tolist())
-        print(taken_boxes)
 
         id = self.crop_bounding_box(
+          image_info,
           image_np,
           ymin,
           xmin,
           ymax,
           xmax,
           use_normalized_coordinates=True)
+        item = {}
+        item['box'] = boxes[i].tolist()
+        item['id'] = id
+        taken_boxes.append(item)
+        # print(taken_boxes)
+        # taken_boxes[id] = boxes[i].tolist()
         # image_info.name = id
         # print(image_info)
         # save_to_storage(image_info)
@@ -125,6 +160,7 @@ class ObjectDetector:
         (im_height, im_width, 3)).astype(np.uint8)
 
   def crop_bounding_box(self,
+                        image_info,
                         image,
                          ymin,
                          xmin,
@@ -161,12 +197,19 @@ class ObjectDetector:
     cropped_img = image_pil.crop(area)
     cropped_img.save(TMP_CROP_IMG_FILE)
     cropped_img.show()
-    # id = save_to_db(image_info)
+    id = self.save_to_db(image_info)
 
     # save_image_to_file(image_pil, ymin, xmin, ymax, xmax,
     #                            use_normalized_coordinates)
     # np.copyto(image, np.array(image_pil))
     return id
+  def save_to_db(self, image):
+    try:
+      api_response = self.__api_instance.add_image(image)
+      pprint(api_response)
+    except ApiException as e:
+      print("Exception when calling ImageApi->add_image: %s\n" % e)
+    return api_response.data._id
 
   def detect_objects(self, image_np, sess, detection_graph, show_box=True):
       # Expand dimensions since the model expects images to have shape: [1, None, None, 3]
@@ -194,7 +237,7 @@ class ObjectDetector:
             np.squeeze(boxes),
             np.squeeze(classes).astype(np.int32),
             np.squeeze(scores),
-            category_index,
+            self.__category_index,
             use_normalized_coordinates=True,
             line_thickness=8)
       # print(image_np)
