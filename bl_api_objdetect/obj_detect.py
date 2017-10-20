@@ -135,16 +135,18 @@ class ObjectDetector:
         print(boxes[i].shape)
         ymin, xmin, ymax, xmax = tuple(boxes[i].tolist())
 
-        id = self.crop_bounding_box(
+        use_normalized_coordinates = True
+        id, left, right, top, bottom = self.crop_bounding_box(
           image_info,
           image_np,
           ymin,
           xmin,
           ymax,
           xmax,
-          use_normalized_coordinates=True)
+          use_normalized_coordinates=use_normalized_coordinates)
         item = {}
-        item['box'] = boxes[i].tolist()
+
+        item['box'] = [left, right, top, bottom]
         item['id'] = id
         taken_boxes.append(item)
         # print(taken_boxes)
@@ -202,7 +204,7 @@ class ObjectDetector:
     # save_image_to_file(image_pil, ymin, xmin, ymax, xmax,
     #                            use_normalized_coordinates)
     # np.copyto(image, np.array(image_pil))
-    return id
+    return id, left, right, top, bottom
   def save_to_db(self, image):
     try:
       api_response = self.__api_instance.add_image(image)

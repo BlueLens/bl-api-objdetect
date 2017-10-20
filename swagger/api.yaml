@@ -2,7 +2,7 @@ swagger: '2.0'
 info:
   description: This is a API document for Object Detection on fashion items"
   version: 0.0.1
-  title: stylelens_detector_sdk
+  title: stylelens-detect
   contact:
     email: devops@bluehack.net
   license:
@@ -51,6 +51,7 @@ definitions:
     maxItems: 4
     items:
       type: number
+      description: [left, right, top, bottom]
       format: float
   BoxesArray:
     type: array
