@@ -16,6 +16,9 @@ from util import label_map_util, s3
 from object_detection.utils import visualization_utils as vis_util
 import swagger_client
 from swagger_client.rest import ApiException
+from stylelens_feature import feature_extract
+import stylelens_search
+from stylelens_search.rest import ApiException
 
 try:
     from StringIO import StringIO
@@ -26,14 +29,6 @@ except ImportError:
 
 TMP_CROP_IMG_FILE = './tmp.jpg'
 
-CWD_PATH = os.getcwd()
-
-# MODEL_NAME = 'ssd_mobilenet_v1_coco_11_06_2017'
-# PATH_TO_CKPT = os.path.join(CWD_PATH, 'object_detection', MODEL_NAME, 'frozen_inference_graph.pb')
-# PATH_TO_LABELS = os.path.join(CWD_PATH, 'object_detection', 'data', 'mscoco_label_map.pbtxt')
-
-# PATH_TO_CKPT = os.path.join('/dataset/deepfashion', 'fig-742673', 'frozen_inference_graph.pb')
-# NUM_CLASSES = 4
 
 NUM_CLASSES = 89
 
@@ -53,37 +48,33 @@ NATION = 'nation'
 AWS_ACCESS_KEY = os.environ['AWS_ACCESS_KEY'].replace('"', '')
 AWS_SECRET_ACCESS_KEY = os.environ['AWS_SECRET_ACCESS_KEY'].replace('"', '')
 
+OD_MODEL = os.environ['OD_MODEL']
+OD_LABELS = os.environ['OD_LABELS']
+
 AWS_BUCKET = 'bluelens-style-model'
 AWS_MODEL_DIR = 'object_detection'
-MODEL_FILE = 'frozen_inference_graph.pb'
-LABEL_FILE = 'label_map.pbtxt'
-
-# LOCAL_MODEL_DIR = '/dataset/deepfashion'
-LOCAL_MODEL_DIR = os.getcwd()
-
-PATH_TO_CKPT = os.path.join(LOCAL_MODEL_DIR, MODEL_FILE)
-PATH_TO_LABELS = os.path.join(LOCAL_MODEL_DIR, LABEL_FILE)
-
-
 
 class ObjectDetector:
   def __init__(self):
     # self.download_model()
     # Loading label map
     self.__api_instance = swagger_client.ImageApi()
-    label_map = label_map_util.load_labelmap(PATH_TO_LABELS)
+    self.__search = stylelens_search.SearchApi()
+    label_map = label_map_util.load_labelmap(OD_LABELS)
     categories = label_map_util.convert_label_map_to_categories(label_map, max_num_classes=NUM_CLASSES,
                                                                 use_display_name=True)
     self.__category_index = label_map_util.create_category_index(categories)
     self.__detection_graph = tf.Graph()
     with self.__detection_graph.as_default():
       od_graph_def = tf.GraphDef()
-      with tf.gfile.GFile(PATH_TO_CKPT, 'rb') as fid:
+      with tf.gfile.GFile(OD_MODEL, 'rb') as fid:
         serialized_graph = fid.read()
         od_graph_def.ParseFromString(serialized_graph)
         tf.import_graph_def(od_graph_def, name='')
 
       self.__sess = tf.Session(graph=self.__detection_graph)
+
+    self.image_feature = feature_extract.ExtractFeature()
 
   def download_model(self):
     storage = s3.S3(AWS_ACCESS_KEY, AWS_SECRET_ACCESS_KEY)
@@ -148,6 +139,8 @@ class ObjectDetector:
 
         item['box'] = [left, right, top, bottom]
         item['id'] = id
+        print('bok')
+        print(item)
         taken_boxes.append(item)
         # print(taken_boxes)
         # taken_boxes[id] = boxes[i].tolist()
@@ -198,13 +191,28 @@ class ObjectDetector:
     area = (left, top, left + abs(left-right), top + abs(bottom-top))
     cropped_img = image_pil.crop(area)
     cropped_img.save(TMP_CROP_IMG_FILE)
+    img_feature_vec = self.image_feature.extract_feature(TMP_CROP_IMG_FILE)
     cropped_img.show()
     id = self.save_to_db(image_info)
+
+    try:
+      # Query to search images
+      print("bok1")
+      api_response = self.__search.search_image(file=TMP_CROP_IMG_FILE)
+      print("bok2")
+      pprint(api_response)
+    except ApiException as e:
+      print("Exception when calling SearchApi->search_image: %s\n" % e)
 
     # save_image_to_file(image_pil, ymin, xmin, ymax, xmax,
     #                            use_normalized_coordinates)
     # np.copyto(image, np.array(image_pil))
     return id, left, right, top, bottom
+
+  def search_image(self, feature_vector):
+    #ToDo: Have to implement searcning image from bl-api-search
+    print('search_image')
+
   def save_to_db(self, image):
     try:
       api_response = self.__api_instance.add_image(image)
