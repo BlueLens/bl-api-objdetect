@@ -132,10 +132,13 @@ def allowed_file(filename):
 @app.route('/', methods=['POST'])
 def detect_objects():
   if request.method == 'POST':
+      print('/: POST')
       file = request.files['file']
       if file and allowed_file(file.filename):
         im = Image.open(file.stream)
         # im.show()
+        size = 300, 300
+        im.thumbnail(size, Image.ANTIALIAS)
         boxes = od.query(im)
         response = {}
         response['code'] = 0

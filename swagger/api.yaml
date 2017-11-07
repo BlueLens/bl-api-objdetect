@@ -46,6 +46,57 @@ securityDefinitions:
     name: api_key
     in: header
 definitions:
+  ImagesArray:
+    type: array
+    items:
+      $ref: '#definitions/Image'
+  Image:
+    type: object
+    properties:
+      name:
+        type: string
+      host_url:
+        type: string
+      host_code:
+        type: string
+      host_name:
+        type: string
+      tags:
+        type: array
+        items:
+          type: string
+      format:
+        type: string
+      product_name:
+        type: string
+      parent_image_raw:
+        type: string
+      parent_image_mobile:
+        type: string
+      parent_image_mobile_thumb:
+        type: string
+      image:
+        type: string
+        example: "s3://bluelens-style-object/n0100016/59e17359f8375c0e9fabb1c8.jpg"
+      class_code:
+        type: string
+        example: "n0100016"
+#      bucket:
+#        type: string
+#      storage:
+#        type: string
+      product_price:
+        type: string
+      currency_unit:
+        type: string
+      product_url:
+        type: string
+      product_no:
+        type: string
+      main:
+        type: integer
+      nation:
+        type: string
   BoxArray:
     type: array
     maxItems: 4
@@ -60,10 +111,14 @@ definitions:
   BoxObject:
     type: object
     properties:
-      id:
-        type: string
       box:
         $ref: '#definitions/BoxArray'
+      class_code:
+        type: string
+      class_name:
+        type: string
+      images:
+        $ref: '#/definitions/ImagesArray'
 
   DetectObjectsResponse:
     type: object

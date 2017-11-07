@@ -14,8 +14,8 @@ import time
 from pprint import pprint
 from util import label_map_util, s3
 from object_detection.utils import visualization_utils as vis_util
-import swagger_client
-from swagger_client.rest import ApiException
+import stylelens_index
+from stylelens_index.rest import ApiException
 from stylelens_feature import feature_extract
 import stylelens_search
 from stylelens_search.rest import ApiException
@@ -58,7 +58,7 @@ class ObjectDetector:
   def __init__(self):
     # self.download_model()
     # Loading label map
-    self.__api_instance = swagger_client.ImageApi()
+    self.__api_instance = stylelens_index.ImageApi()
     self.__search = stylelens_search.SearchApi()
     label_map = label_map_util.load_labelmap(OD_LABELS)
     categories = label_map_util.convert_label_map_to_categories(label_map, max_num_classes=NUM_CLASSES,
@@ -75,6 +75,7 @@ class ObjectDetector:
       self.__sess = tf.Session(graph=self.__detection_graph)
 
     self.image_feature = feature_extract.ExtractFeature()
+    print('_init_ done')
 
   def download_model(self):
     storage = s3.S3(AWS_ACCESS_KEY, AWS_SECRET_ACCESS_KEY)
@@ -91,14 +92,27 @@ class ObjectDetector:
       show_box = True
       out_image, boxes, scores, classes, num_detections = self.detect_objects(image_np, self.__sess, self.__detection_graph, show_box)
 
-      image_info = swagger_client.Image()
+      image_info = stylelens_index.Image()
       out_boxes = self.take_object(
                   image_info,
                   out_image,
                   np.squeeze(boxes),
                   np.squeeze(scores),
                   np.squeeze(classes).astype(np.int32))
-      print(out_boxes)
+
+      item = {}
+      if len(out_boxes) == 0:
+        image.save(TMP_CROP_IMG_FILE)
+        try:
+          api_response = self.__search.search_image(file=TMP_CROP_IMG_FILE)
+          if api_response.code == 0 and api_response.data != None:
+            res_images = api_response.data.images
+            item['box'] = [0, 0, 0, 0]
+            item['images'] = res_images
+            out_boxes.append(item)
+
+        except ApiException as e:
+          print("Exception when calling SearchApi->search_image: %s\n" % e)
 
       if show_box:
         img = Image.fromarray(out_image, 'RGB')
@@ -109,7 +123,7 @@ class ObjectDetector:
 
   def take_object(self, image_info, image_np, boxes, scores, classes):
     max_boxes_to_save = 10
-    min_score_thresh = .3
+    min_score_thresh = .5
     taken_boxes = []
     if not max_boxes_to_save:
       max_boxes_to_save = boxes.shape[0]
@@ -127,7 +141,8 @@ class ObjectDetector:
         ymin, xmin, ymax, xmax = tuple(boxes[i].tolist())
 
         use_normalized_coordinates = True
-        id, left, right, top, bottom = self.crop_bounding_box(
+        # id, res_images, left, right, top, bottom = self.crop_bounding_box(
+        left, right, top, bottom = self.crop_bounding_box(
           image_info,
           image_np,
           ymin,
@@ -138,9 +153,11 @@ class ObjectDetector:
         item = {}
 
         item['box'] = [left, right, top, bottom]
-        item['id'] = id
-        print('bok')
-        print(item)
+        # item['images'] = res_images
+        # item['id'] = id
+        item['class_name'] = class_name
+        item['class_code'] = class_code
+        # print(item)
         taken_boxes.append(item)
         # print(taken_boxes)
         # taken_boxes[id] = boxes[i].tolist()
@@ -188,26 +205,28 @@ class ObjectDetector:
       (left, right, top, bottom) = (xmin, xmax, ymin, ymax)
 
     # print(image_pil)
-    area = (left, top, left + abs(left-right), top + abs(bottom-top))
-    cropped_img = image_pil.crop(area)
-    cropped_img.save(TMP_CROP_IMG_FILE)
-    img_feature_vec = self.image_feature.extract_feature(TMP_CROP_IMG_FILE)
-    cropped_img.show()
-    id = self.save_to_db(image_info)
+    # area = (left, top, left + abs(left-right), top + abs(bottom-top))
+    # cropped_img = image_pil.crop(area)
+    # cropped_img.save(TMP_CROP_IMG_FILE)
+    # img_feature_vec = self.image_feature.extract_feature(TMP_CROP_IMG_FILE)
+    # cropped_img.show()
+    # id = self.save_to_db(image_info)
 
-    try:
-      # Query to search images
-      print("bok1")
-      api_response = self.__search.search_image(file=TMP_CROP_IMG_FILE)
-      print("bok2")
-      pprint(api_response)
-    except ApiException as e:
-      print("Exception when calling SearchApi->search_image: %s\n" % e)
+
+    # try:
+    #   api_response = self.__search.search_image(file=TMP_CROP_IMG_FILE)
+    #   if api_response.code == 0 and api_response.data != None:
+    #     res_images = api_response.data.images
+    #
+    # except ApiException as e:
+    #   print("Exception when calling SearchApi->search_image: %s\n" % e)
 
     # save_image_to_file(image_pil, ymin, xmin, ymax, xmax,
     #                            use_normalized_coordinates)
     # np.copyto(image, np.array(image_pil))
-    return id, left, right, top, bottom
+    # return id, res_images, left, right, top, bottom
+    # return id, left, right, top, bottom
+    return left, right, top, bottom
 
   def search_image(self, feature_vector):
     #ToDo: Have to implement searcning image from bl-api-search

@@ -1,9 +1,8 @@
-FROM bluelens/tensorflow:1.3.0-py3
+FROM bluelens/bl-api-objdetect-base:latest
 
 #ENV WEB_CONCURRENCY=4
 
 RUN mkdir -p /usr/src/app
-RUN mkdir -p /dataset/deepfashion
 
 WORKDIR /usr/src/app
 
@@ -11,8 +10,7 @@ COPY . /usr/src/app
 
 #RUN apt-get install ca-certificates libffi6 libstdc++ && \
 #    apt-get install --virtual build-deps build-base libffi-dev && \
-RUN pip install --no-cache-dir gunicorn /usr/src/app
-RUN pip install --no-cache-dir /usr/src/app/python-client
+#RUN pip install --no-cache-dir gunicorn /usr/src/app
 
 EXPOSE 8080
 

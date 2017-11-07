@@ -33,6 +33,6 @@ setup(
         'flask', 'MarkupSafe', 'decorator', 'itsdangerous', 'six', 'brotlipy',
         'raven[flask]', 'flask_limiter', 'Flask-Common',
         'pymongo', 'Pillow', 'tensorflow', 'colorama',
-        'boto3', 'gevent', 'stylelens-feature', 'stylelens-search'
+        'boto3', 'gevent', 'stylelens-feature', 'stylelens-search', 'stylelens-index'
     ],
 )
