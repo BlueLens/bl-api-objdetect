@@ -113,13 +113,21 @@ class ObjectDetector:
                   np.squeeze(classes).astype(np.int32))
 
       item = {}
-      if len(out_boxes) == 0:
-        image.save(TMP_CROP_IMG_FILE)
+      if len(out_boxes) < 2:
+        if len(out_boxes) == 0:
+          item['box'] = [0, 0, 0, 0]
+          image.save(TMP_CROP_IMG_FILE)
+        elif len(out_boxes) == 1:
+          self.save_box_to_file(out_boxes[0]['box'], image, ratio)
+          item['box'] = out_boxes[0]['box']
+          item['class_code'] = out_boxes[0]['class_code']
+          item['class_name'] = out_boxes[0]['class_name']
+          out_boxes.clear()
+
         try:
           api_response = self.__search.search_image(file=TMP_CROP_IMG_FILE)
           if api_response.code == 0 and api_response.data != None:
             res_images = api_response.data.images
-            item['box'] = [0, 0, 0, 0]
             item['images'] = res_images
             out_boxes.append(item)
 
@@ -132,6 +140,15 @@ class ObjectDetector:
 
       return out_boxes
 
+  def save_box_to_file(self, box, image, ratio):
+    left = box[0] * ratio
+    right = box[1] * ratio
+    top = box[2] * ratio
+    bottom = box[3] * ratio
+    area = (left, top, left + abs(left-right), top + abs(bottom-top))
+    new_image = image.crop(area)
+    new_image.save(TMP_CROP_IMG_FILE)
+    return new_image
 
   def take_object(self, image_info, ratio, image_np, boxes, scores, classes):
     max_boxes_to_save = 3
@@ -154,7 +171,6 @@ class ObjectDetector:
         ymin, xmin, ymax, xmax = tuple(boxes[i].tolist())
 
         use_normalized_coordinates = True
-        # id, res_images, left, right, top, bottom = self.crop_bounding_box(
         left, right, top, bottom = self.crop_bounding_box(
           image_info,
           image_np,
@@ -166,17 +182,9 @@ class ObjectDetector:
         item = {}
 
         item['box'] = [left / ratio, right / ratio, top / ratio, bottom / ratio]
-        # item['images'] = res_images
-        # item['id'] = id
         item['class_name'] = class_name
         item['class_code'] = class_code
-        # print(item)
         taken_boxes.append(item)
-        # print(taken_boxes)
-        # taken_boxes[id] = boxes[i].tolist()
-        # image_info.name = id
-        # print(image_info)
-        # save_to_storage(image_info)
     return taken_boxes
 
   def load_image_into_numpy_array(self, image):

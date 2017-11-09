@@ -144,8 +144,7 @@ def detect_objects():
           bg.paste(im, (0,0), im)
           bg.save('file.jpg', quality=95)
           im = bg
-        # im.convert('RGB')
-        # im.show()
+
         boxes = od.query(im)
         response = {}
         response['code'] = 0
