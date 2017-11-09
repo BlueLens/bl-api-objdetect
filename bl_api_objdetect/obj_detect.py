@@ -61,6 +61,7 @@ class ObjectDetector:
     self.__api_instance = stylelens_index.ImageApi()
     self.__search = stylelens_search.SearchApi()
     label_map = label_map_util.load_labelmap(OD_LABELS)
+    print(label_map)
     categories = label_map_util.convert_label_map_to_categories(label_map, max_num_classes=NUM_CLASSES,
                                                                 use_display_name=True)
     self.__category_index = label_map_util.create_category_index(categories)
@@ -87,6 +88,16 @@ class ObjectDetector:
                                       os.path.join(AWS_MODEL_DIR, LABEL_FILE))
 
   def query(self, image):
+      origin_size = image.size
+      size = 300, 300
+      image.thumbnail(size, Image.ANTIALIAS)
+      new_size = image.size
+
+      ratio = 1
+      if new_size[0] == 300:
+        ratio = new_size[0] / origin_size[0]
+      elif new_size[1] == 300:
+        ratio = new_size[1] / origin_size[1]
       image_np = self.load_image_into_numpy_array(image)
 
       show_box = True
@@ -95,6 +106,7 @@ class ObjectDetector:
       image_info = stylelens_index.Image()
       out_boxes = self.take_object(
                   image_info,
+                  ratio,
                   out_image,
                   np.squeeze(boxes),
                   np.squeeze(scores),
@@ -121,14 +133,15 @@ class ObjectDetector:
       return out_boxes
 
 
-  def take_object(self, image_info, image_np, boxes, scores, classes):
-    max_boxes_to_save = 10
-    min_score_thresh = .5
+  def take_object(self, image_info, ratio, image_np, boxes, scores, classes):
+    max_boxes_to_save = 3
+    min_score_thresh = 0.1
     taken_boxes = []
     if not max_boxes_to_save:
       max_boxes_to_save = boxes.shape[0]
     for i in range(min(max_boxes_to_save, boxes.shape[0])):
       if scores is None or scores[i] > min_score_thresh:
+        print(scores[i])
         if classes[i] in self.__category_index.keys():
           class_name = self.__category_index[classes[i]]['name']
           class_code = self.__category_index[classes[i]]['code']
@@ -152,7 +165,7 @@ class ObjectDetector:
           use_normalized_coordinates=use_normalized_coordinates)
         item = {}
 
-        item['box'] = [left, right, top, bottom]
+        item['box'] = [left / ratio, right / ratio, top / ratio, bottom / ratio]
         # item['images'] = res_images
         # item['id'] = id
         item['class_name'] = class_name
@@ -268,6 +281,8 @@ class ObjectDetector:
             np.squeeze(scores),
             self.__category_index,
             use_normalized_coordinates=True,
+            max_boxes_to_draw=3,
+            min_score_thresh=.05,
             line_thickness=8)
       # print(image_np)
       return image_np, boxes, scores, classes, num_detections

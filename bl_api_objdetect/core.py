@@ -136,9 +136,16 @@ def detect_objects():
       file = request.files['file']
       if file and allowed_file(file.filename):
         im = Image.open(file.stream)
+        file_type = file.filename.rsplit('.', 1)[1]
+        if 'jpg' == file_type or 'JPG' == file_type or 'jpeg' == file_type or 'JPEG' == file_type:
+            print('jpg')
+        else:
+          bg = Image.new("RGB", im.size, (255,255,255))
+          bg.paste(im, (0,0), im)
+          bg.save('file.jpg', quality=95)
+          im = bg
+        # im.convert('RGB')
         # im.show()
-        size = 300, 300
-        im.thumbnail(size, Image.ANTIALIAS)
         boxes = od.query(im)
         response = {}
         response['code'] = 0
