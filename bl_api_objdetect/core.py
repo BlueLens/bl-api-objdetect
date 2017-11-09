@@ -138,7 +138,21 @@ def detect_objects():
         im = Image.open(file.stream)
         file_type = file.filename.rsplit('.', 1)[1]
         if 'jpg' == file_type or 'JPG' == file_type or 'jpeg' == file_type or 'JPEG' == file_type:
-            print('jpg')
+          print('jpg')
+        elif 'gif' == file_type or 'GIF' == file_type:
+          print('gif')
+          im.seek(0)
+          mypalette = im.getpalette()
+          im.putpalette(mypalette)
+          new_im = Image.new("RGBA", im.size)
+          new_im.paste(im)
+          new_im.save('foo' + '.png')
+
+          bg = Image.new("RGB", im.size, (255,255,255))
+          bg.paste(new_im, (0,0), new_im)
+          bg.save('file.jpg', quality=95)
+          im = bg
+
         else:
           bg = Image.new("RGB", im.size, (255,255,255))
           bg.paste(im, (0,0), im)
@@ -146,6 +160,7 @@ def detect_objects():
           im = bg
 
         boxes = od.query(im)
+        # boxes = {}
         response = {}
         response['code'] = 0
         response['message'] = ""
