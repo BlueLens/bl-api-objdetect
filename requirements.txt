@@ -47,7 +47,7 @@ stylelens-detect==1.0.0
 stylelens-feature==1.0.2
 stylelens-index==1.0.0
 stylelens-search==1.0.1
-tensorflow==1.3.0
+tensorflow==2.5.0
 tensorflow-tensorboard==0.1.8
 tzlocal==1.4
 urllib3==1.22
